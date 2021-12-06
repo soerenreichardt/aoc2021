@@ -10,6 +10,9 @@ fn main() {
 
     // let (oxygen, scubba) = day3::life_support_rating(read_file("input/day3_2"));
     // println!("{}", oxygen * scubba);)
+
+    let result = day4::play_bingo(read_file("input/day4"));
+    println!("{}", result);
 }
 
 pub fn read_file(path: &str) -> String {
