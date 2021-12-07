@@ -1,13 +1,10 @@
-use std::array::IntoIter;
-use std::collections::{Bound, HashMap};
-use std::ops::Bound::Included;
-use std::ops::RangeBounds;
-use crate::day5::IterationDirection::NONE;
+use std::collections::{HashMap};
+use std::ops::{Sub};
 
-#[derive(Eq, PartialEq, Debug, Hash)]
+#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
 struct Point {
-    x: u32,
-    y: u32
+    x: i32,
+    y: i32
 }
 
 impl From<&str> for Point {
@@ -19,8 +16,19 @@ impl From<&str> for Point {
     }
 }
 
+impl Sub for Point {
+    type Output = Point;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Point {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y
+        }
+    }
+}
+
 impl Point {
-    fn new(x: u32, y: u32) -> Self {
+    fn new(x: i32, y: i32) -> Self {
         Point { x, y }
     }
 }
@@ -36,15 +44,14 @@ impl From<(Point, Point)> for Line {
     }
 }
 
-enum IterationDirection {
-    X, Y, NONE
+struct LineIntoIterator {
+    distance: Point,
+    direction: Point,
+    last_point: Point
 }
 
-struct LineIntoIterator {
-    line: Line,
-    iteration_direction: IterationDirection,
-    iteration_value: u32,
-    upper_bound: u32
+fn diagonal_lines() -> bool {
+    false
 }
 
 impl IntoIterator for Line {
@@ -52,39 +59,33 @@ impl IntoIterator for Line {
     type IntoIter = LineIntoIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        if self.start.x != self.end.x && self.start.y != self.end.y {
+        let direction_vector = self.end - self.start;
+
+        if !diagonal_lines() && direction_vector.x != 0 && direction_vector.y != 0 {
             return LineIntoIterator {
-                line: self,
-                iteration_direction: IterationDirection::NONE,
-                iteration_value: 0,
-                upper_bound: 0
+                distance: Point::new(0, 0),
+                direction: Point::new(0, 0),
+                last_point: Point::new(0, 0)
             }
         }
 
-        let iteration_direction = match (self.start.x == self.end.x, self.start.y == self.end.y) {
-            (true, false) => IterationDirection::Y,
-            (false, true) => IterationDirection::X,
-            (true, true) => IterationDirection::NONE,
-            (false, false) => panic!("This should not happen")
-        };
+        let distance_x = direction_vector.x.abs() + 1;
+        let distance_y = direction_vector.y.abs() + 1;
 
-        let iteration_value = match iteration_direction {
-            IterationDirection::X => self.start.x,
-            IterationDirection::Y => self.start.y,
-            IterationDirection::NONE => self.start.x
-        };
+        let distance = Point::new(distance_x, distance_y);
 
-        let upper_bound = match iteration_direction {
-            IterationDirection::X => self.end.x,
-            IterationDirection::Y => self.end.y,
-            IterationDirection::NONE => self.start.x
-        };
+        let step_x = if self.start.x == self.end.x { 0 } else { 1 };
+        let step_y = if self.start.y == self.end.y { 0 } else { 1 };
+
+        let direction_x = direction_vector.x.signum();
+        let direction_y = direction_vector.y.signum();
+
+        let direction = Point::new(step_x * direction_x, step_y * direction_y);
 
         LineIntoIterator {
-            line: self,
-            iteration_direction,
-            iteration_value,
-            upper_bound
+            distance,
+            direction,
+            last_point: self.start
         }
     }
 }
@@ -93,17 +94,25 @@ impl Iterator for LineIntoIterator {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.iteration_value <= self.upper_bound {
-            let next_point = match self.iteration_direction {
-                IterationDirection::X => Point { x: self.iteration_value, y: self.line.start.y },
-                IterationDirection::Y => Point { x: self.line.end.x, y: self.iteration_value },
-                IterationDirection::NONE => Point { x: self.line.start.x, y: self.line.start.y }
-            };
-            self.iteration_value += 1;
-            Some(next_point)
-        } else {
-            None
+        if self.distance == Point::new(0, 0) {
+            return None
         }
+
+        let interpolated_point = Some(self.last_point);
+
+        let mut x = self.last_point.x;
+        let mut y = self.last_point.y;
+        if self.distance.x > 0 {
+            x += self.direction.x;
+            self.distance.x -= 1;
+        }
+        if self.distance.y > 0 {
+            y += self.direction.y;
+            self.distance.y -= 1;
+        }
+
+        self.last_point = Point::new(x, y);
+        interpolated_point
     }
 }
 
@@ -152,6 +161,19 @@ mod tests {
                 Point::new(4, 3),
             ]
         );
+
+        let line = Line { start: Point::new(4, 3), end: Point::new(1, 3) };
+        let points: Vec<Point> = line.into_iter().collect();
+
+        assert_eq!(
+            points,
+            vec![
+                Point::new(4, 3),
+                Point::new(3, 3),
+                Point::new(2, 3),
+                Point::new(1, 3),
+            ]
+        );
     }
 
     #[test]
@@ -175,6 +197,10 @@ mod tests {
 0,0 -> 8,8
 5,5 -> 8,2".to_string();
 
-        assert_eq!(find_hydrothermal_vents(input), 5);
+        if diagonal_lines() {
+            assert_eq!(find_hydrothermal_vents(input), 12);
+        } else {
+            assert_eq!(find_hydrothermal_vents(input), 5);
+        }
     }
 }
