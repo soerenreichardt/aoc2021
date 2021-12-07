@@ -1,23 +1,29 @@
+use std::os::linux::raw::stat;
+
 pub fn lanternfish_simulation(data: String) {
     let mut population_state = data.lines().into_iter()
         .flat_map(|line| line.split(",").into_iter())
         .map(|i| i.parse::<u32>().unwrap())
         .collect::<Vec<u32>>();
 
-    for day in 0..256 {
-        let mut new_population_state = Vec::new();
-        for fish in population_state {
-            if fish == 0 {
-                new_population_state.push(6);
-                new_population_state.push(8);
-            } else {
-                new_population_state.push(fish - 1);
-            }
-        }
-        population_state = new_population_state;
+    let mut state: [u64;9] = [0; 9];
+
+    population_state.iter().for_each(|&fish| state[fish as usize] += 1);
+
+    for _ in 0..256 {
+        let tmp = state[0];
+        state[0] = state[1];
+        state[1] = state[2];
+        state[2] = state[3];
+        state[3] = state[4];
+        state[4] = state[5];
+        state[5] = state[6];
+        state[6] = state[7] + tmp;
+        state[7] = state[8];
+        state[8] = tmp;
     }
 
-    println!("{}", population_state.len());
+    println!("{}", state.iter().sum::<u64>());
 }
 
 #[cfg(test)]
