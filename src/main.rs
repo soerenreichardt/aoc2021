@@ -15,8 +15,8 @@ fn main() {
     // let result = day4::play_bingo(read_file("input/day4"));
     // println!("{}", result);
 
-    let num_vents = day5::find_hydrothermal_vents(read_file("input/day5"));
-    println!("{}", num_vents);
+    // let num_vents = day5::find_hydrothermal_vents(read_file("input/day5"));
+    // println!("{}", num_vents);
 }
 
 pub fn read_file(path: &str) -> String {

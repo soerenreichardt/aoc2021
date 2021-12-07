@@ -1,169 +1,122 @@
 use core::num;
-use std::{collections::HashSet, ptr::null};
-use std::collections::HashMap;
 
-use crate::main;
-
-struct BingoBoard {
-    grids: Vec<Grid>,
-    won_grids: HashSet<usize>,
-    last_won_grid_pos: Option<(usize, u32)>,
-}
-
-enum Solve {
-    FIRST,
-    LAST,
-}
-
-impl BingoBoard {
-    fn new(grids: Vec<Grid>) -> Self {
-        BingoBoard { grids, won_grids: HashSet::new(), last_won_grid_pos: None }
-    }
-
-    fn process_number(&mut self, number: u32, solve: &Solve) -> Option<&mut Grid> {
-        let winning_grid = self.grids.iter_mut()
-            .enumerate()
-            .map(|(pos, grid)| {
-                grid.process_number(number);
-                println!("{}", grid.game_won());
-                (pos, grid)
-            })
-            .find(|(pos, grid)| grid.game_won() && !self.won_grids.contains(pos));
-
-        println!("{:?}", self.won_grids);
-        match winning_grid {
-            Some((pos, grid)) => {
-                self.won_grids.insert(pos);
-
-                match solve {
-                    Solve::FIRST => Some(grid),
-                    Solve::LAST => {
-                        self.last_won_grid_pos = Some((pos, number));
-                        None
-                    }
-                    _ => None
-                }
-            }
-            None => None
-        }
-    }
-
-    fn process_numbers(&mut self, numbers: Vec<u32>, solve: &Solve) -> u32 {
-        let mut processed_numbers: HashSet<u32> = HashSet::new();
-        println!("{:?}", self.grids[1].numbers);
-        for number in &numbers {
-            processed_numbers.insert(*number);
-            // println!("{}", number);
-            match self.process_number(*number, solve) {
-                Some(grid) => {
-                    let unmarked_numbers_sum = BingoBoard::sum_unmarked_numbers(&processed_numbers, grid);
-                    return unmarked_numbers_sum * number;
-                }
-                None => {}
-            }
-            println!("{}", number);
-            println!("{:?}", self.grids[1].found_in_column);
-        }
-        match self.last_won_grid_pos {
-            Some((pos, number)) => {
-                let earlier_processed_numbers = BingoBoard::build_hashset_until_winning_number(&numbers, number);
-                let unmarked_numbers_sum = BingoBoard::sum_unmarked_numbers(&earlier_processed_numbers, &mut self.grids[pos]);
-                println!("{:?}", earlier_processed_numbers);
-                return unmarked_numbers_sum * number;
-            },
-            None => 0
-        }
-    }
-
-    fn build_hashset_until_winning_number(numbers: &Vec<u32>, win_number: u32) -> HashSet<u32> {
-        let mut processed_numbers = HashSet::new();
-        numbers.iter().take_while(|number| **number != win_number).for_each(|number| {
-            processed_numbers.insert(*number);
-            ()
-        });
-        processed_numbers
-    }
-
-    fn sum_unmarked_numbers(processed_numbers: &HashSet<u32>, grid: &mut Grid) -> u32 {
-        grid.numbers
-            .iter()
-            .flat_map(|rows| rows.iter())
-            .filter(|number| !processed_numbers.contains(number))
-            .sum()
-    }
-}
-
-#[derive(Hash, PartialEq, Eq)]
 struct Grid {
-    dimension: usize,
     numbers: Vec<Vec<u32>>,
-    found_in_row: Vec<u32>,
-    found_in_column: Vec<u32>,
+    found_in_rows: Vec<u32>,
+    found_in_columns: Vec<u32>,
+    won: bool
+}
+
+struct GridBuilder {
+    numbers: Vec<Vec<u32>>
+}
+
+impl GridBuilder {
+    fn new() -> Self {
+        GridBuilder {
+            numbers: Vec::new()
+        }
+    }
+
+    fn add_row(&mut self, row: Vec<u32>) -> &Self {
+        self.numbers.push(row);
+        self
+    }
+
+    fn build(self) -> Grid {
+        Grid { numbers: self.numbers, found_in_rows: vec![0; 5], found_in_columns: vec![0; 5], won: false }
+    }
+}
+
+struct Board {
+    grids: Vec<Grid>
+}
+
+impl From<Vec<&str>> for Board {
+    fn from(lines: Vec<&str>) -> Self {
+        let grid_builders = lines.into_iter().fold(Vec::new(), |mut builders, line| {
+            match line.trim() {
+                "" => {
+                    builders.push(GridBuilder::new());
+                    builders
+                },
+                str_row => {
+                    let row = str_row.split_whitespace().map(|str_num| str_num.parse::<u32>().unwrap()).collect();
+                    builders.last_mut().unwrap().add_row(row);
+                    builders
+                }
+            }
+        });
+        
+        let grids: Vec<Grid> = grid_builders.into_iter().map(|grid_builder| grid_builder.build()).collect();
+        Board { grids }
+    }
 }
 
 impl Grid {
-    fn new(numbers: Vec<Vec<u32>>) -> Grid {
-        let row_length = numbers.first().unwrap().len();
-        let uniform_row_length = numbers.iter().map(|row| row.len()).all(|length| length == row_length);
-        if !(uniform_row_length && row_length == numbers.len()) {
-            panic!("Grid is not quadratic")
-        }
-
-        Grid { dimension: row_length, numbers, found_in_row: vec![0; row_length], found_in_column: vec![0; row_length] }
-    }
-
-    fn process_number(&mut self, inserted_number: u32) {
+    fn check_number(&mut self, number: u32) -> &mut Self {
         for (y, row) in self.numbers.iter().enumerate() {
-            for (x, number) in row.iter().enumerate() {
-                if *number == inserted_number {
-                    self.found_in_row[y] += 1;
-                    self.found_in_column[x] += 1;
+            for (x, num) in row.iter().enumerate() {
+                if *num == number {
+                    self.found_in_columns[x] += 1;
+                    self.found_in_rows[y] += 1;
+
+                    if self.found_in_columns.contains(&5) || self.found_in_rows.contains(&5) {
+                        self.won = true;
+                    }
                 }
             }
         }
+
+        self
     }
 
-    fn game_won(&self) -> bool {
-        for column in &self.found_in_column {
-            if *column == self.dimension as u32 {
-                return true;
+    fn sum_unmarked(&self, marked_numbers: Vec<u32>) -> u32 {
+        let mut sum = 0;
+        for (y, row) in self.numbers.iter().enumerate() {
+            for (x, num) in row.iter().enumerate() {
+                if !marked_numbers.contains(num) {
+                    sum += num;
+                }
             }
         }
-
-        for row in &self.found_in_row {
-            if *row == self.dimension as u32 {
-                return true;
-            }
-        }
-
-        false
+        sum
     }
 }
 
 pub fn play_bingo(data: String) -> u32 {
     let lines: Vec<&str> = data.lines().collect();
 
-    let input = lines.first().unwrap();
+    let bingo_input: Vec<u32> = lines[0].split(",").map(|str_num| str_num.trim().parse::<u32>().unwrap()).collect();
 
-    let grids: Vec<Grid> = lines.iter().skip(1).fold(Vec::new(), |mut grids_rows: Vec<Vec<Vec<u32>>>, line| {
-        match line.trim() {
-            a if a.is_empty() => {
-                let grid_builder = Vec::new();
-                grids_rows.push(grid_builder);
-                grids_rows
-            }
-            _ => {
-                let row: Vec<u32> = line.split_whitespace().map(|s| s.parse().unwrap()).collect();
-                grids_rows.last_mut().unwrap().push(row);
-                grids_rows
-            }
+    let mut board = Board::from(lines.into_iter().skip(1).collect::<Vec<&str>>());
+    let mut grids = board.grids.iter_mut().collect::<Vec<_>>();
+
+    for number in &bingo_input {
+        let (won, remaining) = grids
+            .into_iter()
+            .map(|grid| grid.check_number(*number))
+            .partition::<Vec<_>, _>(|grid| grid.won);
+
+        if (won.len() == 1 && remaining.is_empty()) {
+            println!("here");
+            return number * won[0].sum_unmarked(marked_numbers(&bingo_input, *number));
         }
-    }).into_iter().map(|rows| Grid::new(rows)).collect();
 
-    let mut board = BingoBoard::new(grids);
+        grids = remaining;
+    }
 
-    let numbers: Vec<u32> = input.split(",").into_iter().map(|number_string| number_string.parse().unwrap()).collect();
-    board.process_numbers(numbers, &Solve::LAST)
+    0
+}
+
+fn marked_numbers(input: &Vec<u32>, target: u32) -> Vec<u32> {
+    let mut input_seq: Vec<u32> = input
+        .iter()
+        .take_while(|&&n| n != target)
+        .map(|n| *n)
+        .collect();
+    input_seq.push(target);
+    input_seq
 }
 
 #[cfg(test)]
