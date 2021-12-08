@@ -17,13 +17,15 @@ pub fn align_crabs(data: String) {
 
     let mut global_best = 1 << 30;
 
-    while local_best <= global_best {
-        global_best = local_best;
+    while true {
+        if (local_best < global_best) {
+            global_best = local_best;
+        }
 
         let left_distance = high_left - low_left;
         let right_distance = high_right - low_right;
 
-        if left_distance < 1 && right_distance < 1 {
+        if left_distance <= 1 && right_distance <= 1 {
             break;
         }
 
@@ -56,13 +58,16 @@ pub fn align_crabs(data: String) {
 
 fn check_alignment(crabs: &Vec<i32>, position: i32) -> i32 {
     crabs.iter().fold(0, |mut fuel, crab| {
-        fuel += (*crab - position).abs();
+        let distance = (*crab - position).abs();
+        fuel += (distance * (distance + 1)) / 2;
         fuel
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     #[test]
