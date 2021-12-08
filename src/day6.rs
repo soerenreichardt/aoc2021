@@ -1,4 +1,3 @@
-use std::os::linux::raw::stat;
 
 pub fn lanternfish_simulation(data: String) {
     let mut population_state = data.lines().into_iter()

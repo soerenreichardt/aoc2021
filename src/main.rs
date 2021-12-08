@@ -4,6 +4,7 @@ mod day3;
 mod day4;
 mod day5;
 mod day6;
+mod day7;
 
 fn main() {
     
@@ -19,7 +20,9 @@ fn main() {
     // let num_vents = day5::find_hydrothermal_vents(read_file("input/day5"));
     // println!("{}", num_vents);
 
-    day6::lanternfish_simulation(read_file("input/day6"))
+    // day6::lanternfish_simulation(read_file("input/day6"))
+
+    day7::align_crabs(read_file("input/day7"))
 }
 
 pub fn read_file(path: &str) -> String {
