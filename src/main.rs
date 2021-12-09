@@ -5,6 +5,7 @@ mod day4;
 mod day5;
 mod day6;
 mod day7;
+mod day8;
 
 fn main() {
     
@@ -22,7 +23,9 @@ fn main() {
 
     // day6::lanternfish_simulation(read_file("input/day6"))
 
-    day7::align_crabs(read_file("input/day7"))
+    // day7::align_crabs(read_file("input/day7"))
+
+    day8::seven_segment_search(read_file("input/day8") /*"baegf cebaf bfcade bga bfacedg bg egbacd bcfg fcbeag gafed | cefba befcga fedbgca geafd".to_string()*/)
 }
 
 pub fn read_file(path: &str) -> String {
