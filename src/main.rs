@@ -6,6 +6,7 @@ mod day5;
 mod day6;
 mod day7;
 mod day8;
+mod day9;
 
 fn main() {
     
@@ -25,7 +26,9 @@ fn main() {
 
     // day7::align_crabs(read_file("input/day7"))
 
-    day8::seven_segment_search(read_file("input/day8") /*"baegf cebaf bfcade bga bfacedg bg egbacd bcfg fcbeag gafed | cefba befcga fedbgca geafd".to_string()*/)
+    // day8::seven_segment_search(read_file("input/day8"))
+
+    day9::lava_tubes(read_file("input/day9").as_str())
 }
 
 pub fn read_file(path: &str) -> String {
