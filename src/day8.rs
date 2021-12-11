@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::process::id;
@@ -31,28 +32,17 @@ impl Default for Numbers {
 }
 
 impl Numbers {
-    fn find_by_length(&self, signal: &str) -> Option<&HashSet<u32>> {
-        if signal.len() == 7 {
-            return None;
-        }
-
-        let found_by_length = self.values
-            .iter()
-            .filter(|(_, value)| value.len() == signal.len())
-            .map(|(_, value)| value)
+    fn find_by_positions(&self, search_positions: &HashSet<u32>) -> u32 {
+        let found_numbers = self.values.iter()
+            .filter(|(_, value)| value.len() == search_positions.len() && (search_positions - value).len() == 0)
+            .map(|(key, _)| key)
             .collect::<Vec<_>>();
 
-        if found_by_length.len() == 1 {
-            return Some(found_by_length[0]);
+        if found_numbers.len() != 1 {
+            panic!();
         }
-        None
-    }
 
-    fn find_by_positions_and_signal(&self, search_positions: &HashSet<u32>, signal: &str) -> Vec<&u32> {
-        self.values.iter()
-            .filter(|(_, value)| signal.len() == value.len() && search_positions.iter().all(|pos| value.contains(pos)))
-            .map(|(key, _)| key)
-            .collect::<Vec<_>>()
+        *found_numbers[0]
     }
 }
 
@@ -70,117 +60,153 @@ pub fn seven_segment_search(data: String) {
 
 fn part2(input: Vec<(Vec<&str>, Vec<&str>)>) {
     let mut overall_result = 0;
-    for (pattern, output) in input {
+    for (mut pattern, output) in input {
+        let mut solved_numbers: HashMap<u32, HashSet<char>> = HashMap::new();
         let mut segments = [Segment::new(), Segment::new(), Segment::new(), Segment::new(), Segment::new(), Segment::new(), Segment::new()];
         let numbers = Numbers::default();
 
-        for _ in 0..2 {
-            pattern.iter().for_each(|signal| {
-                if let Some(positions) = numbers.find_by_length(signal) {
-                    solve_known_pattern(&mut segments, signal, positions);
-                    remove_signal_from_other_segments(&mut segments, signal, positions);
-                }
+        solve_known_patterns(&mut solved_numbers, &mut pattern, &mut segments);
+        solve_nine(&mut solved_numbers, &pattern, &mut segments);
+        solve_six(&mut solved_numbers, &pattern, &mut segments);
+        solve_zero(&mut solved_numbers, &pattern, &mut segments);
 
-                set_unknown_pattern(&mut segments, signal);
+        overall_result += find_number_for_output_signal(&output, &segments, &numbers);
 
-                // debug(&segments);
-            });
-        }
-
-        let mut decoded_numbers: HashMap<u32, HashSet<char>> = HashMap::new();
-        pattern.iter().for_each(|&signal| {
-            if let Some(number) = find_best_matching_number(&mut segments, &numbers, signal, &mut decoded_numbers) {
-                let number_positions = numbers.values.get(&number).unwrap();
-                for (pos, segment) in segments.iter_mut().enumerate() {
-                    if number_positions.contains(&(pos as u32)) {
-                        segment.identifiers.retain(|c| signal.contains(|i| i == *c));
-                    } else {
-                        segment.identifiers = &segment.identifiers - &HashSet::from_iter(signal.chars().collect::<Vec<_>>().iter().map(|c| *c));
-                    }
-                }
-            }
-            debug(&segments);
-        });
-
-        let mut row_result = 0;
-        for signal in output {
-            let number = find_exact_matching_number(&mut segments, &numbers, signal);
-            row_result = (row_result * 10) + number;
-        }
-        println!("{}", row_result);
-        overall_result += row_result;
+        debug(&segments);
     }
 
     println!("{}", overall_result);
 }
 
-fn find_exact_matching_number(segments: &mut [Segment; 7], numbers: &Numbers, signal: &str) -> u32 {
-    let mut positions = HashSet::new();
-    for c in signal.chars() {
-        for position in find_all_segment_positions_with_identifier(segments, c) {
-            positions.insert(position);
+fn solve_known_patterns(mut solved_numbers: &mut HashMap<u32, HashSet<char>>, mut pattern: &mut Vec<&str>, mut segments: &mut [Segment; 7]) {
+    pattern.sort_by(|a, b| a.len().partial_cmp(&b.len()).unwrap());
+    pattern.iter().for_each(|signal| {
+        let signal_char_set = HashSet::from_iter(signal.chars());
+        match signal.len() {
+            2 => {
+                let chars = signal.chars().collect::<Vec<_>>();
+                segments[2].identifiers.insert(chars[0]);
+                segments[2].identifiers.insert(chars[1]);
+                segments[5].identifiers.insert(chars[0]);
+                segments[5].identifiers.insert(chars[1]);
+                solved_numbers.insert(1, signal_char_set);
+            }
+            3 => {
+                let identifiers = &segments[2].identifiers;
+                let diff = &signal_char_set - identifiers;
+                segments[0].identifiers.insert(*diff.iter().collect::<Vec<_>>()[0]);
+                solved_numbers.insert(7, signal_char_set);
+            }
+            4 => {
+                let identifiers = &segments[2].identifiers;
+                let diff = &signal_char_set - identifiers;
+                let diff_chars = diff.iter().collect::<Vec<_>>();
+                segments[1].identifiers.insert(*diff_chars[0]);
+                segments[1].identifiers.insert(*diff_chars[1]);
+                segments[3].identifiers.insert(*diff_chars[0]);
+                segments[3].identifiers.insert(*diff_chars[1]);
+                solved_numbers.insert(4, signal_char_set);
+            }
+            7 => {
+                let one = solved_numbers.get(&1).unwrap();
+                let four = solved_numbers.get(&4).unwrap();
+                let seven = solved_numbers.get(&7).unwrap();
+
+                let identifiers = one.union(four).copied().collect::<HashSet<char>>().union(seven).copied().collect::<HashSet<char>>();
+                let diff = &signal_char_set - &identifiers;
+                let diff_chars = diff.iter().collect::<Vec<_>>();
+                segments[4].identifiers.insert(*diff_chars[0]);
+                segments[4].identifiers.insert(*diff_chars[1]);
+                segments[6].identifiers.insert(*diff_chars[0]);
+                segments[6].identifiers.insert(*diff_chars[1]);
+                solved_numbers.insert(8, signal_char_set);
+            }
+            _ => ()
         }
-    }
-
-    let found_numbers = numbers.find_by_positions_and_signal(&positions, signal);
-    if found_numbers.len() == 1 {
-        return *found_numbers[0];
-    }
-
-    println!("sig: {}, found numbers: {:?}", signal, found_numbers);
-    panic!()
+    });
 }
 
-fn find_best_matching_number(segments: &mut [Segment; 7], numbers: &Numbers, signal: &str, decoded_numbers: &mut HashMap<u32, HashSet<char>>) -> Option<u32> {
-    println!("signal: {}", signal);
+fn solve_nine(mut solved_numbers: &mut HashMap<u32, HashSet<char>>, pattern: &Vec<&str>, mut segments: &mut [Segment; 7]) {
+    let seven_and_four: HashSet<char> = solved_numbers.get(&7).unwrap()
+        .union(solved_numbers.get(&4).unwrap())
+        .copied()
+        .collect();
 
-    let mut counter = [0; 10];
-    for c in signal.chars() {
-        let segment_positions = find_all_segment_positions_with_identifier(segments, c);
+    solve_for_pattern(&mut solved_numbers, &pattern, &mut segments, &seven_and_four, 6, 9, 6);
+}
 
-        let found_numbers = numbers.find_by_positions_and_signal(&segment_positions, signal);
+fn solve_six(mut solved_numbers: &mut HashMap<u32, HashSet<char>>, pattern: &Vec<&str>, mut segments: &mut [Segment; 7]) {
+    let match_pattern = &segments[1].identifiers
+        .union(&segments[0].identifiers).copied().collect::<HashSet<_>>()
+        .union(&segments[4].identifiers).copied().collect::<HashSet<_>>()
+        .union(&segments[6].identifiers).copied().collect::<HashSet<_>>();
 
-        found_numbers.iter()
-            .filter(|num| !decoded_numbers.contains_key(num))
-            .for_each(|&&num| counter[num as usize] += 1);
-        println!("signal: {}, found numbers: {:?}", c, found_numbers);
-    }
+    solve_for_pattern(&mut solved_numbers, &pattern, &mut segments, match_pattern, 6, 6, 5);
+}
 
-    let mut max_pos = 0;
-    let mut max_value = 0;
-    for (pos, value) in counter.iter().enumerate() {
-        if *value > max_value {
-            max_value = *value;
-            max_pos = pos;
+fn solve_zero(mut solved_numbers: &mut HashMap<u32, HashSet<char>>, pattern: &Vec<&str>, mut segments: &mut [Segment; 7]) {
+    let match_pattern = &segments[0].identifiers
+        .union(&segments[2].identifiers).copied().collect::<HashSet<_>>()
+        .union(&segments[4].identifiers).copied().collect::<HashSet<_>>()
+        .union(&segments[5].identifiers).copied().collect::<HashSet<_>>()
+        .union(&segments[6].identifiers).copied().collect::<HashSet<_>>();
+
+    solve_for_pattern(&mut solved_numbers, &pattern, &mut segments, match_pattern, 6, 0, 1);
+}
+
+fn solve_for_pattern(
+    mut solved_numbers: &mut HashMap<u32, HashSet<char>>,
+    pattern: &Vec<&str>,
+    mut segments: &mut [Segment; 7],
+    match_pattern: &HashSet<char>,
+    target_pattern_length: usize,
+    solved_number: u32,
+    identified_segment_position: usize
+) {
+    for signal in pattern {
+        let signal_char_set = HashSet::from_iter(signal.chars());
+        let diff = &signal_char_set - match_pattern;
+        if diff.len() == 1 && signal.len() == target_pattern_length {
+            solved_numbers.insert(solved_number, signal_char_set);
+            let diff_char = diff.iter().nth(0).unwrap();
+            segments[identified_segment_position].identifiers.retain(|c| diff_char == c);
+            remove_char_from_other_segments(diff_char, segments, identified_segment_position);
         }
-    }
-
-    let num_winners = counter.iter().filter(|&&i| i == max_value).count();
-    if (num_winners == 1 && max_value * 2 >= signal.len()) {
-        println!("best matching number: {}", max_pos);
-        decoded_numbers.insert(max_pos as u32, HashSet::from_iter(signal.chars()));
-        return Some(max_pos as u32);
-    } else {
-        return None;
     }
 }
 
-fn find_all_segment_positions_with_identifier(segments: &[Segment; 7], identifier: char) -> HashSet<u32> {
-    let mut positions = HashSet::new();
-    for (pos, segment) in segments.iter().enumerate() {
-        if segment.identifiers.is_empty() || segment.identifiers.contains(&identifier) {
-            positions.insert(pos as u32);
-        }
+fn remove_char_from_other_segments(c: &char, mut segments: &mut [Segment; 7], exclude_from_removal: usize) {
+    for (pos, segment) in segments.iter_mut().enumerate() {
+        if pos == exclude_from_removal { continue }
+
+        segment.identifiers.remove(c);
     }
-    positions
 }
 
-fn match_signal_to_number(segments: &mut [Segment; 7], numbers: &Numbers, signal: &str, number: u32) {
-    let positions = numbers.values.get(&number).unwrap();
-    for position in positions {
+fn find_number_for_output_signal(output_signals: &Vec<&str>, segments: &[Segment; 7], numbers: &Numbers) -> u32 {
+    let mut row_result = 0;
+    for output_signal in output_signals {
+        let positions = find_positions_for_signal(segments, output_signal);
+        let decoded_number = numbers.find_by_positions(&positions);
+        row_result = row_result * 10 + decoded_number;
+    }
+
+    return row_result;
+
+    fn find_positions_for_signal(segments: &[Segment; 7], signal: &str) -> HashSet<u32> {
+        let mut positions = HashSet::new();
+
         for c in signal.chars() {
-            segments[*position as usize].identifiers.retain(|identifier| &c == identifier);
+            for (pos, segment) in segments.iter().enumerate() {
+                if segment.identifiers.contains(&c) {
+                    positions.insert(pos as u32);
+                }
+            }
         }
+
+        assert_eq!(positions.len(), signal.len());
+
+        positions
     }
 }
 
@@ -189,52 +215,6 @@ fn debug(segments: &[Segment; 7]) {
         println!("[{}]: {:?} -- {}", pos, segment.identifiers, segment.locked);
     }
     println!("==========")
-}
-
-fn solve_known_pattern(segments: &mut [Segment; 7], signal: &str, known_positions: &HashSet<u32>) {
-    for (pos, segment) in segments.iter_mut().enumerate() {
-        if segment.locked && segment.identifiers.len() <= known_positions.len() {
-            continue;
-        }
-        if known_positions.contains(&(pos as u32)) {
-            // found an assignment with less values
-            segment.identifiers.clear();
-            for c in signal.chars() {
-                segment.identifiers.insert(c);
-            }
-            segment.locked = true;
-        }
-    }
-}
-
-fn set_unknown_pattern(segments: &mut [Segment; 7], signal: &str) {
-    let mut signal_identifiers: HashSet<char> = HashSet::from_iter(signal.chars().collect::<Vec<_>>());
-    let mut free_positions: HashSet<u32> = HashSet::from_iter((0..7).collect::<Vec<_>>());
-    for (pos, segment) in segments.iter().enumerate() {
-        for identifier in &segment.identifiers {
-            if signal_identifiers.contains(&identifier) {
-                signal_identifiers.remove(&identifier);
-                free_positions.remove(&(pos as u32));
-            }
-        }
-    }
-
-    for free_position in &free_positions {
-        for signal_identifier in &signal_identifiers {
-            segments[*free_position as usize].identifiers.insert(*signal_identifier);
-        }
-    }
-}
-
-fn remove_signal_from_other_segments(segments: &mut [Segment; 7], signal: &str, positions: &HashSet<u32>) {
-    for (pos, segment) in segments.iter_mut().enumerate() {
-        if segment.identifiers.len() == 1 { continue }
-        if !positions.contains(&(pos as u32)) {
-            for c in signal.chars() {
-                segment.identifiers.remove(&c);
-            }
-        }
-    }
 }
 
 fn part1(input: Vec<(Vec<&str>, Vec<&str>)>) {
