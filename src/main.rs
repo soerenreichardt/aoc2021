@@ -28,7 +28,11 @@ fn main() {
 
     // day8::seven_segment_search(read_file("input/day8"))
 
-    day9::lava_tubes(read_file("input/day9").as_str())
+    day9::lava_tubes(read_file("input/day9").as_str() /*"2199943210
+3987894921
+9856789892
+8767896789
+9899965678"*/)
 }
 
 pub fn read_file(path: &str) -> String {
