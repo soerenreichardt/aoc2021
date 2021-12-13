@@ -8,6 +8,7 @@ mod day7;
 mod day8;
 mod day9;
 mod day10;
+mod day11;
 
 fn main() {
     
@@ -31,7 +32,9 @@ fn main() {
 
     // day9::lava_tubes(read_file("input/day9").as_str())
 
-    day10::syntax_scoring(read_file("input/day10"));
+    // day10::syntax_scoring(read_file("input/day10"));
+
+    day11::dumbo_octopus(read_file("input/day11"));
 }
 
 pub fn read_file(path: &str) -> String {
