@@ -9,6 +9,7 @@ mod day8;
 mod day9;
 mod day10;
 mod day11;
+mod day12;
 
 fn main() {
     
@@ -34,7 +35,9 @@ fn main() {
 
     // day10::syntax_scoring(read_file("input/day10"));
 
-    day11::dumbo_octopus(read_file("input/day11"));
+    // day11::dumbo_octopus(read_file("input/day11"));
+
+    day12::passage_pathing(read_file("input/day12").as_str())
 }
 
 pub fn read_file(path: &str) -> String {
