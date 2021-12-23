@@ -40,27 +40,7 @@ fn main() {
 
     // day12::passage_pathing(read_file("input/day12").as_str())
 
-    day13::transparent_origami("6,10
-    0,14
-    9,10
-    0,3
-    10,4
-    4,11
-    6,0
-    6,12
-    4,1
-    0,13
-    10,12
-    3,4
-    3,0
-    8,4
-    1,10
-    2,14
-    8,10
-    9,0
-    
-    fold along y=7
-    fold along x=5")
+    day13::transparent_origami(read_file("input/day13").as_str())
 }
 
 pub fn read_file(path: &str) -> String {
