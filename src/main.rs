@@ -12,6 +12,7 @@ mod day11;
 mod day12;
 mod day13;
 mod day14;
+mod day15;
 
 fn main() {
     
@@ -43,7 +44,9 @@ fn main() {
 
     // day13::transparent_origami(read_file("input/day13").as_str())
 
-    day14::extended_polymerization(read_file("input/day14").as_str())
+    // day14::extended_polymerization(read_file("input/day14").as_str())
+
+    day15::chiton(read_file("input/day15").as_str())
 }
 
 pub fn read_file(path: &str) -> String {
